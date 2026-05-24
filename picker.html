@@ -1,0 +1,207 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Pick a session</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #1e1d1b; color: #ECEAE4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; overflow: hidden;
+  }
+  #wrap { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+  header { padding: 12px 14px 10px; flex: none; }
+  .h { display: flex; align-items: center; }
+  .h .title { font-size: 13px; font-weight: 600; color: #ECEAE4; }
+  .h .sp { flex: 1; }
+  .icobtn {
+    background: none; border: none; color: #86837c; font-size: 14px;
+    cursor: pointer; padding: 2px 6px; border-radius: 5px;
+  }
+  .icobtn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .subh { font-size: 11px; color: #86837c; margin-top: 3px; }
+  .legend { display: flex; gap: 14px; margin-top: 9px; font-size: 11px; color: #86837c; }
+  .legend .d { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+  #list { flex: 1; overflow-y: auto; }
+  .item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .item:hover { background: rgba(255,255,255,0.05); }
+  .item.sel { background: rgba(90,166,255,0.14); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .body { flex: 1; min-width: 0; }
+  .tt { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub { font-size: 11px; color: #6f6c66; margin-top: 1px; }
+  .size { font-size: 12px; font-weight: 600; flex: none; }
+  .chk { width: 14px; color: #5aa6ff; font-size: 14px; flex: none; text-align: center; }
+  .foot { padding: 10px 14px; font-size: 11px; color: #6f6c66; border-top: 1px solid rgba(255,255,255,0.06); }
+  #note { padding: 30px 16px; text-align: center; color: #86837c; font-size: 12px; line-height: 1.5; }
+  #note button {
+    margin-top: 10px; padding: 6px 14px; background: #5aa6ff; color: #fff;
+    border: none; border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <header>
+      <div class="h">
+        <span class="title">Track a session</span>
+        <span class="sp"></span>
+        <button class="icobtn" id="refresh" title="Reload">&#8635;</button>
+      </div>
+      <div class="subh">Pick a Cowork session or Claude chat to pin, or follow your most recent.</div>
+      <div class="legend">
+        <span><span class="d" style="background:#4ade80;"></span>healthy</span>
+        <span><span class="d" style="background:#fbbf24;"></span>getting large</span>
+        <span><span class="d" style="background:#ef6f6e;"></span>start a new one</span>
+      </div>
+    </header>
+    <div id="list"></div>
+    <div id="note" class="hidden"></div>
+  </div>
+
+<script>
+'use strict';
+const { ipcRenderer } = require('electron');
+
+let sessions = [];
+let pinned = null;
+let webState = 'ok';
+
+const listEl = document.getElementById('list');
+const noteEl = document.getElementById('note');
+
+const TIER_COLOR = { ok: '#4ade80', large: '#fbbf24', huge: '#ef6f6e' };
+const SIZE_COLOR = { ok: '#9aa39a', large: '#fbbf24', huge: '#ef6f6e' };
+
+function fmtTokens(n) {
+  if (!n || n < 0) return '0';
+  if (n >= 1000) return Math.round(n / 1000) + 'k';
+  return String(n);
+}
+
+function relTime(ms) {
+  if (!ms) return '';
+  const d = Date.now() - ms;
+  if (d < 60000) return 'active now';
+  const m = Math.floor(d / 60000);
+  if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+  const dd = Math.floor(h / 24);
+  if (dd < 30) return dd + (dd === 1 ? ' day ago' : ' days ago');
+  return Math.floor(dd / 30) + 'mo ago';
+}
+
+function pick(session) {
+  ipcRenderer.send('cc-pin', session
+    ? { kind: session.kind, id: session.id, name: session.title }
+    : {});
+}
+
+function makeRow(opts) {
+  const el = document.createElement('div');
+  el.className = 'item' + (opts.selected ? ' sel' : '');
+
+  const dot = document.createElement('div');
+  dot.className = 'dot';
+  dot.style.background = opts.dotColor || 'transparent';
+
+  const body = document.createElement('div');
+  body.className = 'body';
+  const tt = document.createElement('div');
+  tt.className = 'tt';
+  tt.textContent = opts.title;
+  const sub = document.createElement('div');
+  sub.className = 'sub';
+  sub.textContent = opts.sub;
+  body.appendChild(tt);
+  body.appendChild(sub);
+
+  const size = document.createElement('div');
+  size.className = 'size';
+  size.textContent = opts.size || '';
+  size.style.color = opts.sizeColor || '#9aa39a';
+
+  const chk = document.createElement('div');
+  chk.className = 'chk';
+  chk.textContent = opts.selected ? '✓' : '';
+
+  el.appendChild(dot);
+  el.appendChild(body);
+  el.appendChild(size);
+  el.appendChild(chk);
+  el.onclick = opts.onClick;
+  return el;
+}
+
+function render() {
+  noteEl.classList.add('hidden');
+  listEl.style.display = '';
+  listEl.replaceChildren();
+
+  listEl.appendChild(makeRow({
+    title: 'Automatic',
+    sub: 'follows your most recently used Cowork session',
+    selected: !pinned,
+    dotColor: 'transparent',
+    size: '',
+    onClick: () => pick(null)
+  }));
+
+  for (const s of sessions) {
+    const kindLabel = s.kind === 'web' ? 'Claude chat' : 'Cowork';
+    listEl.appendChild(makeRow({
+      title: s.title,
+      sub: kindLabel + ' · ' + relTime(s.lastActiveMs),
+      selected: !!(pinned && pinned.kind === s.kind && pinned.id === s.id),
+      dotColor: TIER_COLOR[s.tier] || '#4ade80',
+      size: '~' + fmtTokens(s.context),
+      sizeColor: SIZE_COLOR[s.tier] || '#9aa39a',
+      onClick: () => pick(s)
+    }));
+  }
+
+  if (webState !== 'ok') {
+    const foot = document.createElement('div');
+    foot.className = 'foot';
+    foot.textContent = webState === 'login'
+      ? 'Sign in to claude.ai to include your Claude web chats here.'
+      : 'Claude web chats could not be loaded — reload in a moment.';
+    listEl.appendChild(foot);
+  }
+}
+
+function showNote(html) {
+  listEl.style.display = 'none';
+  noteEl.classList.remove('hidden');
+  noteEl.innerHTML = html;
+  const btn = noteEl.querySelector('button');
+  if (btn) btn.onclick = requestList;
+}
+
+function requestList() {
+  showNote('Reading your sessions…');
+  ipcRenderer.send('cc-picker-ready');
+}
+
+ipcRenderer.on('cc-list', (_e, data) => {
+  pinned = (data && data.pinned) || null;
+  webState = (data && data.webState) || 'ok';
+  sessions = (data && Array.isArray(data.sessions)) ? data.sessions : [];
+  if (!sessions.length && webState !== 'ok') {
+    showNote('No sessions found yet.<br><button>Reload</button>');
+  } else {
+    render();
+  }
+});
+
+document.getElementById('refresh').onclick = requestList;
+requestList();
+</script>
+</body>
+</html>

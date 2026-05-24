@@ -1,0 +1,298 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Claude Counter</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: transparent; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none; cursor: default;
+  }
+  #card {
+    position: fixed; inset: 0; box-sizing: border-box;
+    background: rgba(30, 29, 27, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px; padding: 9px 12px 11px; color: #ECEAE4;
+  }
+  #title {
+    display: flex; align-items: center; gap: 7px; height: 18px;
+    -webkit-app-region: drag;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em; color: #a7a49d;
+  }
+  #dot { width: 7px; height: 7px; border-radius: 50%; background: #fbbf24; flex: none; }
+  #title .sp { flex: 1; }
+  .btn {
+    -webkit-app-region: no-drag; background: none; border: none; color: #86837c;
+    font-size: 13px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px;
+  }
+  .btn:hover { color: #fff; background: rgba(255, 255, 255, 0.09); }
+
+  .metric { margin-top: 10px; }
+  .metric:first-child { margin-top: 9px; }
+  .mrow { display: flex; align-items: baseline; font-size: 12px; }
+  .mrow .lab { color: #d9d6cf; font-weight: 600; }
+  .mrow .val { color: #ECEAE4; margin-left: 7px; }
+  .mrow .sp { flex: 1; }
+  .mrow .rt { font-size: 11px; white-space: nowrap; color: #86837c; }
+  .bar {
+    position: relative; height: 9px; margin-top: 5px;
+    border-radius: 3px; background: rgba(255, 255, 255, 0.08);
+  }
+  .fill {
+    height: 100%; width: 0%; border-radius: 3px 0 0 3px; background: #5aa6ff;
+    transition: width .35s ease, background-color .3s ease;
+  }
+  .fill.full { border-radius: 3px; }
+  .mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #ffffff; left: 0%; }
+
+  #ctx { margin-top: 11px; }
+  .crow { display: flex; align-items: center; font-size: 12px; }
+  .crow .lab { color: #d9d6cf; font-weight: 600; }
+  #ctxBar {
+    position: relative; width: 40px; height: 7px; flex: none; margin: 0 8px;
+    border-radius: 3px; background: rgba(255, 255, 255, 0.08);
+  }
+  #ctxFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; border-radius: 3px; background: #5aa6ff; }
+  .crow .val { color: #ECEAE4; }
+  .crow .sp { flex: 1; }
+  .crow .rt { font-size: 11px; white-space: nowrap; font-weight: 500; }
+  #ctxName {
+    margin-top: 3px; font-size: 10px; color: #6f6c66; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #ctxName:hover { text-decoration: underline; }
+
+  #umsg { font-size: 12px; color: #a7a49d; text-align: center; padding: 15px 4px; }
+  #umsg .act {
+    -webkit-app-region: no-drag; margin-top: 8px; padding: 4px 13px;
+    background: #5aa6ff; color: #fff; border: none; border-radius: 6px;
+    font-size: 12px; cursor: pointer;
+  }
+  #umsg .act:hover { background: #74b4ff; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="card">
+    <div id="title">
+      <span id="dot"></span>
+      <span>Claude Counter</span>
+      <span class="sp"></span>
+      <button class="btn" id="pick" title="Pick which session to track">&#9678;</button>
+      <button class="btn" id="refresh" title="Refresh now">&#8635;</button>
+      <button class="btn" id="close" title="Quit">&#10005;</button>
+    </div>
+
+    <div id="bars">
+      <div class="metric">
+        <div class="mrow">
+          <span class="lab">Weekly</span><span class="val" id="wkPct">&ndash;</span>
+          <span class="sp"></span><span class="rt" id="wkPace"></span>
+        </div>
+        <div class="bar"><div class="fill" id="wkFill"></div><div class="mark" id="wkMark"></div></div>
+      </div>
+      <div class="metric">
+        <div class="mrow">
+          <span class="lab">Session</span><span class="val" id="sePct">&ndash;</span>
+          <span class="sp"></span><span class="rt" id="seReset"></span>
+        </div>
+        <div class="bar"><div class="fill" id="seFill"></div><div class="mark" id="seMark"></div></div>
+      </div>
+    </div>
+    <div id="umsg" class="hidden"></div>
+
+    <div id="ctx">
+      <div class="crow">
+        <span class="lab">Context</span>
+        <span id="ctxBar"><span id="ctxFill"></span></span>
+        <span class="val" id="ctxVal">&ndash;</span>
+        <span class="sp"></span>
+        <span class="rt" id="ctxWarn"></span>
+      </div>
+      <div id="ctxName" title="Click to pick a session">&nbsp;</div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+const { ipcRenderer } = require('electron');
+const WK = 7 * 24 * 60 * 60 * 1000;
+const SE = 5 * 60 * 60 * 1000;
+
+let ctx = null;
+let usage = null;
+const $ = (s) => document.querySelector(s);
+
+function fmtTokens(n) {
+  if (!n || n < 0) return '0';
+  if (n >= 1000) return Math.round(n / 1000) + 'k';
+  return String(n);
+}
+
+function fmtReset(ms) {
+  if (ms <= 0) return 'now';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return 'in ' + s + 's';
+  const m = Math.round(s / 60);
+  if (m < 60) return 'in ' + m + 'm';
+  const h = Math.floor(m / 60), rm = m % 60;
+  if (h < 24) return 'in ' + h + 'h ' + rm + 'm';
+  const d = Math.floor(h / 24), rh = h % 24;
+  return 'in ' + d + 'd ' + rh + 'h';
+}
+
+function dotColor() {
+  if (usage && usage.state === 'error') return '#ef6f6e';
+  if (usage && usage.state === 'ok') return '#4ade80';
+  return '#fbbf24';
+}
+
+function renderWeekly(w) {
+  const fill = $('#wkFill'), mark = $('#wkMark'), pace = $('#wkPace');
+  if (!w) {
+    $('#wkPct').textContent = '–';
+    fill.style.width = '0%'; mark.style.display = 'none'; pace.textContent = '';
+    return;
+  }
+  const u = Math.max(0, Math.min(100, w.utilization));
+  $('#wkPct').textContent = (Math.round(u * 10) / 10) + '%';
+  fill.style.width = u + '%';
+  fill.classList.toggle('full', u >= 99.5);
+  if (w.resets_at) {
+    const reset = Date.parse(w.resets_at);
+    const elapsed = Math.max(0, Math.min(1, (Date.now() - (reset - WK)) / WK));
+    const expected = elapsed * 100;
+    const delta = u - expected;
+    mark.style.display = '';
+    mark.style.left = Math.max(0, Math.min(100, expected)) + '%';
+    if (delta > 1) {
+      pace.textContent = '↑ ' + Math.round(delta) + '% over pace';
+      pace.style.color = '#ef6f6e';
+      fill.style.background = '#e2504f';
+    } else if (delta < -1) {
+      pace.textContent = '↓ ' + Math.round(-delta) + '% under pace';
+      pace.style.color = '#5fcf87';
+      fill.style.background = '#4ade80';
+    } else {
+      pace.textContent = 'on pace';
+      pace.style.color = '#86837c';
+      fill.style.background = '#5aa6ff';
+    }
+  } else {
+    mark.style.display = 'none';
+    pace.textContent = '';
+    fill.style.background = '#5aa6ff';
+  }
+}
+
+function renderSession(w) {
+  const fill = $('#seFill'), mark = $('#seMark');
+  if (!w) {
+    $('#sePct').textContent = '–';
+    fill.style.width = '0%'; mark.style.display = 'none'; $('#seReset').textContent = '';
+    return;
+  }
+  const u = Math.max(0, Math.min(100, w.utilization));
+  $('#sePct').textContent = (Math.round(u * 10) / 10) + '%';
+  fill.style.width = u + '%';
+  fill.style.background = '#5aa6ff';
+  fill.classList.toggle('full', u >= 99.5);
+  if (w.resets_at) {
+    const reset = Date.parse(w.resets_at);
+    $('#seReset').textContent = 'resets ' + fmtReset(reset - Date.now());
+    const el = Math.max(0, Math.min(1, (Date.now() - (reset - SE)) / SE));
+    mark.style.display = '';
+    mark.style.left = (el * 100) + '%';
+  } else {
+    $('#seReset').textContent = '';
+    mark.style.display = 'none';
+  }
+}
+
+function renderUsage() {
+  const ok = !!(usage && usage.state === 'ok' && usage.usage);
+  $('#bars').classList.toggle('hidden', !ok);
+  $('#umsg').classList.toggle('hidden', ok);
+  if (ok) {
+    renderWeekly(usage.usage.seven_day);
+    renderSession(usage.usage.five_hour);
+    return;
+  }
+  const m = $('#umsg');
+  if (usage && usage.state === 'login') {
+    m.innerHTML = 'Sign in to claude.ai for the usage bars.' +
+      '<br><button class="act" id="si">Sign in</button>';
+    $('#si').onclick = () => ipcRenderer.send('cc-login');
+  } else if (usage && usage.state === 'error') {
+    m.innerHTML = '⚠ ' + (usage.message || 'Connection error') +
+      '<br><button class="act" id="rt">Retry</button>';
+    $('#rt').onclick = () => ipcRenderer.send('cc-refresh');
+  } else {
+    m.textContent = 'Checking usage…';
+  }
+}
+
+function renderContext() {
+  const val = $('#ctxVal'), name = $('#ctxName'), fill = $('#ctxFill'), warn = $('#ctxWarn');
+  if (!ctx) {
+    val.textContent = '–'; val.style.color = '#86837c';
+    warn.textContent = '';
+    name.textContent = 'no session found'; name.style.color = '#6f6c66';
+    fill.style.width = '0%';
+    return;
+  }
+  if (ctx.unavailable) {
+    val.textContent = '–'; val.style.color = '#86837c';
+    warn.textContent = '';
+    name.textContent = 'claude · ' + (ctx.title || 'chat') + ' — sign in';
+    name.style.color = '#6f6c66';
+    fill.style.width = '0%';
+    return;
+  }
+  const kindLabel = ctx.kind === 'web' ? 'claude · ' : 'cowork · ';
+  val.textContent = '~' + fmtTokens(ctx.tokens);
+  const pct = Math.max(0, Math.min(100, (ctx.tokens / (ctx.limit || 1000000)) * 100));
+  fill.style.width = pct + '%';
+  name.textContent = kindLabel + (ctx.title || 'session');
+  if (ctx.tier === 'huge') {
+    val.style.color = '#ef6f6e';
+    fill.style.background = '#e2504f';
+    warn.textContent = '⚠ start a new chat';
+    warn.style.color = '#ef6f6e';
+    name.style.color = '#ef6f6e';
+  } else if (ctx.tier === 'large') {
+    val.style.color = '#fbbf24';
+    fill.style.background = '#fbbf24';
+    warn.textContent = 'getting large';
+    warn.style.color = '#fbbf24';
+    name.style.color = '#8a8884';
+  } else {
+    val.style.color = '#ECEAE4';
+    fill.style.background = '#5aa6ff';
+    warn.textContent = '';
+    name.style.color = '#6f6c66';
+  }
+}
+
+function render() {
+  $('#dot').style.background = dotColor();
+  renderUsage();
+  renderContext();
+}
+
+ipcRenderer.on('usage', (_e, d) => { usage = d; render(); });
+ipcRenderer.on('context', (_e, d) => { ctx = d; render(); });
+
+$('#pick').onclick = () => ipcRenderer.send('cc-open-picker');
+$('#refresh').onclick = () => ipcRenderer.send('cc-refresh');
+$('#close').onclick = () => ipcRenderer.send('cc-quit');
+$('#ctxName').onclick = () => ipcRenderer.send('cc-open-picker');
+
+setInterval(() => { if (usage && usage.state === 'ok') render(); }, 1000);
+
+render();
+</script>
+</body>
+</html>
