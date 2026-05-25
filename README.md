@@ -13,7 +13,7 @@ Lets you see all your chats and thier context burn.
 
 Three readouts, each refreshed on its own.
 
-Weekly usage comes with a pacing read. The weekly limit resets every seven days, so an even spend works out a little over 14% a day. A marker on the bar shows where an even spend would put you at this exact point in the week. Ahead of the marker the bar turns red and tells you by how much; behind it, green. Some days you will be over and some under. The point is that you can see it and pace yourself rather than guess.
+Weekly usage comes with a pacing read. The weekly limit resets every seven days, so an even spend works out a little over 14% a day. A marker on the bar shows where an even spend would put you at this exact point in the week. Ahead of the marker the bar turns red and tells you by how much; behind it, green. Some days you will be over and some under. The point is that you can see it and pace yourself rather than guess. When you are running ahead, it also reckons the recovery — how many hours of spending nothing it would take for the marker to draw level again.
 
 Session usage is the shorter five-hour window, with a countdown to its reset. Nothing clever here. It is simply useful to have in view.
 

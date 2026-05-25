@@ -36,6 +36,7 @@
   .mrow .val { color: #ECEAE4; margin-left: 7px; }
   .mrow .sp { flex: 1; }
   .mrow .rt { font-size: 11px; white-space: nowrap; color: #86837c; }
+  .mrow .tonorm { font-size: 11px; white-space: nowrap; color: #8a8884; margin-left: 8px; }
   .bar {
     position: relative; height: 9px; margin-top: 5px;
     border-radius: 3px; background: rgba(255, 255, 255, 0.08);
@@ -89,6 +90,7 @@
       <div class="metric">
         <div class="mrow">
           <span class="lab">Weekly</span><span class="val" id="wkPct">&ndash;</span>
+          <span class="tonorm" id="wkToNormal"></span>
           <span class="sp"></span><span class="rt" id="wkPace"></span>
         </div>
         <div class="bar"><div class="fill" id="wkFill"></div><div class="mark" id="wkMark"></div></div>
@@ -143,6 +145,11 @@ function fmtReset(ms) {
   return 'in ' + d + 'd ' + rh + 'h';
 }
 
+function fmtHours(h) {
+  if (h >= 10) return Math.round(h) + 'h';
+  return (Math.round(h * 10) / 10) + 'h';
+}
+
 function dotColor() {
   if (usage && usage.state === 'error') return '#ef6f6e';
   if (usage && usage.state === 'ok') return '#4ade80';
@@ -151,9 +158,11 @@ function dotColor() {
 
 function renderWeekly(w) {
   const fill = $('#wkFill'), mark = $('#wkMark'), pace = $('#wkPace');
+  const toNorm = $('#wkToNormal');
   if (!w) {
     $('#wkPct').textContent = '–';
     fill.style.width = '0%'; mark.style.display = 'none'; pace.textContent = '';
+    toNorm.textContent = '';
     return;
   }
   const u = Math.max(0, Math.min(100, w.utilization));
@@ -171,19 +180,27 @@ function renderWeekly(w) {
       pace.textContent = '↑ ' + Math.round(delta) + '% over pace';
       pace.style.color = '#ef6f6e';
       fill.style.background = '#e2504f';
+      // Hours of zero token use for the pace marker to catch up to current
+      // usage. The marker advances 100% per weekly window, so closing a
+      // delta-point gap takes delta / (100 / WK_hours) hours.
+      const hrs = delta * (WK / 3600000) / 100;
+      toNorm.textContent = '~' + fmtHours(hrs) + ' to normal';
     } else if (delta < -1) {
       pace.textContent = '↓ ' + Math.round(-delta) + '% under pace';
       pace.style.color = '#5fcf87';
       fill.style.background = '#4ade80';
+      toNorm.textContent = '';
     } else {
       pace.textContent = 'on pace';
       pace.style.color = '#86837c';
       fill.style.background = '#5aa6ff';
+      toNorm.textContent = '';
     }
   } else {
     mark.style.display = 'none';
     pace.textContent = '';
     fill.style.background = '#5aa6ff';
+    toNorm.textContent = '';
   }
 }
 
