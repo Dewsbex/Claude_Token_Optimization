@@ -35,7 +35,7 @@ const CHROME_UA =
 
 // =========================================================================
 // Browser-side snippets (run inside the logged-in claude.ai page).
-// Read-only GETs only.
+// Read-only GETs only. No backticks or ${ } inside these strings.
 // =========================================================================
 const USAGE_SNIPPET = `
 (async () => {
@@ -54,6 +54,7 @@ const USAGE_SNIPPET = `
 })()
 `;
 
+// Pure-JS helpers: walk a conversation's active branch and pull out text.
 const HELPERS = `
   function txtOfItem(item) {
     if (!item || typeof item !== 'object' || typeof item.type !== 'string') return '';
@@ -92,6 +93,7 @@ const HELPERS = `
   }
 `;
 
+// Body: list recent web chats and measure each one's text length.
 const WEB_LIST_BODY = `
   try {
     var c = document.cookie.split('; ').find(function (x) { return x.indexOf('lastActiveOrg=') === 0; });
@@ -131,6 +133,7 @@ const WEB_LIST_BODY = `
   }
 `;
 
+// Body: measure one web chat by id (CID is injected before this runs).
 const WEB_ONE_BODY = `
   try {
     var c = document.cookie.split('; ').find(function (x) { return x.indexOf('lastActiveOrg=') === 0; });
@@ -156,6 +159,9 @@ function webOneSnippet(id) {
   return '(async () => { var CID = ' + JSON.stringify(String(id)) + ';' + HELPERS + WEB_ONE_BODY + '})()';
 }
 
+// =========================================================================
+// State
+// =========================================================================
 let overlay = null, worker = null, picker = null;
 let usageTimer = null, contextTimer = null;
 let usagePolling = false;
@@ -164,6 +170,7 @@ let pinned = null; // { kind: 'cowork'|'web', id, name } or null (= auto)
 function sendOverlay(ch, p) { if (overlay && !overlay.isDestroyed()) overlay.webContents.send(ch, p); }
 function sendPicker(ch, p) { if (picker && !picker.isDestroyed()) picker.webContents.send(ch, p); }
 
+// --- pinned-session persistence ------------------------------------------
 function pinPath() { return path.join(app.getPath('userData'), 'cc-pin.json'); }
 function loadPin() {
   try {
@@ -176,6 +183,7 @@ function savePin(p) {
   try { fs.writeFileSync(pinPath(), JSON.stringify(p || null)); } catch (e) { /* ignore */ }
 }
 
+// --- tiers ----------------------------------------------------------------
 function tierOf(ctx, kind) {
   const large = kind === 'web' ? WEB_LARGE : COWORK_LARGE;
   const huge = kind === 'web' ? WEB_HUGE : COWORK_HUGE;
@@ -185,6 +193,7 @@ function tierOf(ctx, kind) {
 }
 function limitOf(kind) { return kind === 'web' ? WEB_LIMIT : COWORK_LIMIT; }
 
+// --- Cowork transcript discovery (local, exact) --------------------------
 function findTranscripts() {
   const home = os.homedir();
   const seeds = [
@@ -241,6 +250,9 @@ function summarize(file) {
   };
 }
 
+// --- worker helper --------------------------------------------------------
+// Runs a snippet inside the hidden claude.ai window. Returns { state: 'pending' }
+// when the window is not ready yet, so callers can quietly wait.
 async function runOnWorker(snippet) {
   if (!worker || worker.isDestroyed() || worker.webContents.isLoading()) return { state: 'pending' };
   const url = worker.webContents.getURL() || '';
@@ -256,6 +268,7 @@ async function runOnWorker(snippet) {
   }
 }
 
+// --- pollers --------------------------------------------------------------
 function coworkContext(target) {
   const s = summarize(target);
   if (!s) return null;
@@ -263,9 +276,10 @@ function coworkContext(target) {
 }
 
 async function pollContext() {
+  // Pinned web chat: read it from claude.ai.
   if (pinned && pinned.kind === 'web') {
     const r = await runOnWorker(webOneSnippet(pinned.id));
-    if (r.state === 'pending') return;
+    if (r.state === 'pending') return; // worker not ready — keep last value
     if (r.state === 'ok') {
       const tokens = Math.round((r.chars || 0) / CHARS_PER_TOKEN);
       sendOverlay('context', {
@@ -277,11 +291,13 @@ async function pollContext() {
     }
     return;
   }
+  // Pinned Cowork session.
   if (pinned && pinned.kind === 'cowork') {
     let ok = false;
     try { ok = fs.statSync(pinned.id).isFile(); } catch (e) { ok = false; }
     if (ok) { sendOverlay('context', coworkContext(pinned.id)); return; }
   }
+  // Auto: most recently active Cowork transcript.
   const files = findTranscripts();
   let target = null, best = -1;
   for (const f of files) { const mt = mtimeOf(f); if (mt > best) { best = mt; target = f; } }
@@ -317,8 +333,10 @@ async function pollUsage() {
   }
 }
 
+// --- session list for the picker -----------------------------------------
 async function buildSessionList() {
   const out = [];
+  // Cowork sessions (local, de-duplicated).
   const byId = new Map();
   for (const f of findTranscripts()) {
     const s = summarize(f);
@@ -332,6 +350,7 @@ async function buildSessionList() {
       context: s.context, tier: tierOf(s.context, 'cowork'), lastActiveMs: s.lastActiveMs
     });
   }
+  // Claude web chats (via claude.ai).
   let webState = 'ok';
   const r = await runOnWorker(WEB_LIST_SNIPPET);
   if (r.state === 'ok' && Array.isArray(r.chats)) {
@@ -343,12 +362,13 @@ async function buildSessionList() {
       });
     }
   } else {
-    webState = r.state;
+    webState = r.state; // login | pending | error
   }
   out.sort((a, b) => b.lastActiveMs - a.lastActiveMs);
   return { sessions: out.slice(0, 50), webState: webState };
 }
 
+// --- windows --------------------------------------------------------------
 function createOverlay() {
   const { workArea } = screen.getPrimaryDisplay();
   const width = 300, height = 168;
@@ -397,6 +417,7 @@ function openPicker() {
   picker.on('closed', () => { picker = null; });
 }
 
+// --- lifecycle & IPC ------------------------------------------------------
 app.whenReady().then(() => {
   pinned = loadPin();
   createOverlay();

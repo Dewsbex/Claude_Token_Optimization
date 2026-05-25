@@ -1,26 +1,7 @@
 @echo off
-setlocal
-set "APPDIR=%~dp0"
-if "%APPDIR:~-1%"=="\" set "APPDIR=%APPDIR:~0,-1%"
-set "EXE=%APPDIR%\node_modules\electron\dist\electron.exe"
-
-if not exist "%EXE%" (
-  echo.
-  echo   Please run "Start Claude Counter" first so the app
-  echo   finishes installing, then run this again.
-  echo.
-  pause
-  exit /b
-)
-
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $app='%~dp0'.TrimEnd('\'); foreach($d in @([Environment]::GetFolderPath('Desktop'),[Environment]::GetFolderPath('Startup'))){ $s=$ws.CreateShortcut($d+'\Claude Counter.lnk'); $s.TargetPath=$app+'\runtime\electron.exe'; $s.Arguments=[char]34+$app+[char]34; $s.WorkingDirectory=$app; $s.Save() }"
 echo.
-echo   Creating a "Claude Counter" shortcut...
-powershell -NoProfile -Command "$w=New-Object -ComObject WScript.Shell; foreach($p in @([Environment]::GetFolderPath('Desktop'),[Environment]::GetFolderPath('Startup'))){ $l=$w.CreateShortcut((Join-Path $p 'Claude Counter.lnk')); $l.TargetPath='%EXE%'; $l.Arguments='.'; $l.WorkingDirectory='%APPDIR%'; $l.Save() }"
-
-echo.
-echo   Done.
-echo   - A "Claude Counter" shortcut is now on your Desktop.
-echo     Right-click it and choose Pin to taskbar or Pin to Start.
-echo   - It will also start automatically when you sign in to Windows.
-echo.
+echo   A "Claude Counter" shortcut is now on your Desktop.
+echo   Right-click it and choose Pin to taskbar.
+echo   It will also start automatically when you sign in to Windows.
 pause
