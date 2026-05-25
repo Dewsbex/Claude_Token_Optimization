@@ -1,6 +1,6 @@
 {
   "name": "claude-counter-desktop",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Always-on-top HUD for Claude — context size and a new-chat warning for Cowork sessions and Claude web chats, plus weekly usage pacing. Consumes zero tokens.",
   "main": "main.js",
   "scripts": {
