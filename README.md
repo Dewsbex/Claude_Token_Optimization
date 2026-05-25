@@ -2,7 +2,9 @@ Claude Chats and Cowork tell you nothing about how much token capacity you have 
 
 This is a small window that sits in the corner of your screen and answers that quietly, while you work. It watches Cowork sessions and ordinary Claude web chats alike.
 
+<img width="668" height="375" alt="image" src="https://github.com/user-attachments/assets/c0846b78-86d1-4769-a6b3-35cbd3b47b7f" />
 <img width="670" height="337" alt="image" src="https://github.com/user-attachments/assets/a0e0e7ff-31f1-4e0f-8a48-a4ebdb3dd6cd" />
+
 
 Counter Sits in the corner of a screen and warns when the current chat context grows, so you can choose to continue and burn more tokens per chat or break-off into a new chat to conserve tokens
 
