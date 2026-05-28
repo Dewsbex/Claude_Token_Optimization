@@ -14,10 +14,40 @@
  * claude.ai (the usage page and your conversation list).
  */
 
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+
+// ----- v0.5.5: App branding -------------------------------------------------
+app.setName('Claude Counter');
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.dewsbex.claude-counter');
+}
+
+// v0.5.5: serve repo files via a custom app:// scheme so picker.html and
+// overlay.html are always returned with text/html Content-Type. On some
+// Windows installs `loadFile` was handing the renderer text/plain, which
+// caused the picker to display raw HTML as plain text.
+const APP_SCHEME = 'app';
+protocol.registerSchemesAsPrivileged([
+  { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
+]);
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.js':   'text/javascript; charset=utf-8',
+  '.png':  'image/png',
+  '.ico':  'image/x-icon',
+  '.json': 'application/json'
+};
+function appUrl(name) { return APP_SCHEME + '://local/' + name; }
+function attachLoadErrorLogging(win, label) {
+  win.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (code === -3 || !isMainFrame) return;
+    console.error('[' + label + '] did-fail-load code=' + code + ' desc=' + desc + ' url=' + url);
+  });
+}
 
 const CLAUDE_URL = 'https://claude.ai/';
 const USAGE_POLL_MS = 60 * 1000;
@@ -379,11 +409,13 @@ function createOverlay() {
     frame: false, resizable: false, transparent: true, alwaysOnTop: true,
     skipTaskbar: false, fullscreenable: false, maximizable: false,
     title: 'Claude Counter',
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlay.loadFile(path.join(__dirname, 'overlay.html'));
+  attachLoadErrorLogging(overlay, 'overlay');
+  overlay.loadURL(appUrl('overlay.html'));
   overlay.webContents.on('did-finish-load', () => pollContext());
   overlay.on('closed', () => { overlay = null; app.quit(); });
 }
@@ -393,6 +425,7 @@ function createWorker() {
     width: 460, height: 660, show: false,
     title: 'Claude Counter — sign in to claude.ai',
     autoHideMenuBar: true,
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: { partition: 'persist:claude-counter', nodeIntegration: false, contextIsolation: true }
   });
   worker.webContents.setWindowOpenHandler(() => ({ action: 'allow' }));
@@ -411,14 +444,31 @@ function openPicker() {
     width: 410, height: 540, title: 'Claude Counter — pick a session',
     autoHideMenuBar: true, resizable: true, minimizable: false, maximizable: false,
     backgroundColor: '#1e1d1b',
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
-  picker.loadFile(path.join(__dirname, 'picker.html'));
+  attachLoadErrorLogging(picker, 'picker');
+  picker.loadURL(appUrl('picker.html'));
   picker.on('closed', () => { picker = null; });
 }
 
 // --- lifecycle & IPC ------------------------------------------------------
 app.whenReady().then(() => {
+  // v0.5.5: serve repo files at app://local/<name> with text/html Content-Type.
+  protocol.handle(APP_SCHEME, async (request) => {
+    try {
+      const u = new URL(request.url);
+      const rel = decodeURIComponent(u.pathname).replace(/^\//, '');
+      const filePath = path.normalize(path.join(__dirname, rel));
+      if (!filePath.startsWith(__dirname)) return new Response('forbidden', { status: 403 });
+      const buf = await fs.promises.readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      return new Response(buf, { headers: { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' } });
+    } catch (e) {
+      return new Response('not found: ' + e.message, { status: 404, headers: { 'Content-Type': 'text/plain' } });
+    }
+  });
+
   pinned = loadPin();
   createOverlay();
   createWorker();
