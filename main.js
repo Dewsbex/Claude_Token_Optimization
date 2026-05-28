@@ -371,7 +371,7 @@ async function buildSessionList() {
 // --- windows --------------------------------------------------------------
 function createOverlay() {
   const { workArea } = screen.getPrimaryDisplay();
-  const width = 300, height = 168;
+  const width = 300, height = 142;
   overlay = new BrowserWindow({
     width, height,
     x: workArea.x + workArea.width - width - 16,
