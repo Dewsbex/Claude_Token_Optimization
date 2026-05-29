@@ -5,8 +5,8 @@
 <title>Claude Counter</title>
 <style>
   :root {
-    --bg: #1e1d1b;
-    --border: rgba(255, 255, 255, 0.09);
+    --bg: rgba(24, 23, 21, 0.78);
+    --border: rgba(255, 255, 255, 0.10);
     --text: #ECEAE4;
     --muted: #a7a49d;
     --hint: #8a8884;
@@ -14,8 +14,8 @@
     --label: #d9d6cf;
     --btn: #86837c;
     --btn-hover-fg: #ffffff;
-    --btn-hover-bg: rgba(255, 255, 255, 0.09);
-    --bar-bg: rgba(255, 255, 255, 0.08);
+    --btn-hover-bg: rgba(255, 255, 255, 0.10);
+    --bar-bg: rgba(255, 255, 255, 0.10);
     --primary: #5aa6ff;
     --primary-soft: #74b4ff;
     --good: #4ade80;
@@ -25,9 +25,10 @@
     --bad-fill: #e2504f;
     --mark: #ffffff;
     --idle: #fbbf24;
+    --divider: rgba(255, 255, 255, 0.10);
   }
   body.light {
-    --bg: #faf8f3;
+    --bg: rgba(250, 248, 243, 0.82);
     --border: rgba(0, 0, 0, 0.12);
     --text: #1f1e1c;
     --muted: #5a5750;
@@ -36,8 +37,8 @@
     --label: #2b2a26;
     --btn: #6a6760;
     --btn-hover-fg: #000000;
-    --btn-hover-bg: rgba(0, 0, 0, 0.06);
-    --bar-bg: rgba(0, 0, 0, 0.08);
+    --btn-hover-bg: rgba(0, 0, 0, 0.08);
+    --bar-bg: rgba(0, 0, 0, 0.10);
     --primary: #2563eb;
     --primary-soft: #1d4ed8;
     --good: #16a34a;
@@ -47,6 +48,7 @@
     --bad-fill: #b91c1c;
     --mark: #1f1e1c;
     --idle: #c2410c;
+    --divider: rgba(0, 0, 0, 0.12);
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -54,117 +56,111 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-user-select: none; user-select: none; cursor: default;
   }
-  #card {
+  #bar {
     position: fixed; inset: 0; box-sizing: border-box;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 12px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 12px; padding: 8px 12px 9px;
+    border-radius: 10px;
     color: var(--text);
+    font-size: 12px;
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-app-region: drag;
     transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
   }
-  #title {
-    display: flex; align-items: center; gap: 7px; height: 18px;
-    -webkit-app-region: drag;
-    font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--muted);
+  #dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--idle); flex: none;
   }
-  #dot { width: 7px; height: 7px; border-radius: 50%; background: var(--idle); flex: none; }
-  #title .sp { flex: 1; }
+  #brand { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; flex: none; }
+  #metrics {
+    display: flex; align-items: center; gap: 12px;
+    flex: 1 1 auto; min-width: 0;
+  }
+  .div {
+    width: 1px; height: 16px; background: var(--divider); flex: none;
+  }
+  .cell {
+    display: flex; align-items: center; gap: 8px;
+    flex: 1 1 0; min-width: 0;
+  }
+  .cell.ctx { flex: 1.4 1 0; }
+  .cell .lab { color: var(--label); font-weight: 600; flex: none; }
+  .cell .val { color: var(--text); font-variant-numeric: tabular-nums; flex: none; }
+  .cell .track {
+    position: relative; height: 7px; flex: 1 1 auto; min-width: 50px;
+    border-radius: 3px; background: var(--bar-bg);
+  }
+  .cell .fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    border-radius: 3px; background: var(--primary);
+    transition: width 0.3s ease, background-color 0.2s ease;
+  }
+  .cell .mark {
+    position: absolute; top: -2px; bottom: -2px; width: 2px;
+    background: var(--mark); left: 0%;
+  }
+  .cell .aux {
+    font-size: 11px; color: var(--btn); white-space: nowrap; flex: none;
+    overflow: hidden; text-overflow: ellipsis; max-width: 28ch;
+    font-variant-numeric: tabular-nums;
+  }
+  #ctxName { cursor: pointer; -webkit-app-region: no-drag; }
+  #ctxName:hover { text-decoration: underline; }
   .btn {
     -webkit-app-region: no-drag; background: none; border: none; color: var(--btn);
-    font-size: 13px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px;
-    transition: color 0.15s, background 0.15s;
+    font-size: 13px; line-height: 1; cursor: pointer; padding: 5px 7px; border-radius: 5px;
+    flex: none; transition: color 0.15s, background 0.15s;
   }
   .btn:hover { color: var(--btn-hover-fg); background: var(--btn-hover-bg); }
-  #theme { font-size: 12px; }
-
-  .metric { margin-top: 7px; }
-  .metric:first-child { margin-top: 8px; }
-  .mrow { display: flex; align-items: baseline; font-size: 12px; }
-  .mrow .lab { color: var(--label); font-weight: 600; }
-  .mrow .val { color: var(--text); margin-left: 7px; }
-  .mrow .sp { flex: 1; }
-  .mrow .rt { font-size: 11px; white-space: nowrap; color: var(--btn); }
-  .mrow .tonorm { font-size: 11px; white-space: nowrap; color: var(--hint); margin-left: 8px; }
-  .bar {
-    position: relative; height: 8px; margin-top: 4px;
-    border-radius: 3px; background: var(--bar-bg);
+  #buttons { display: flex; align-items: center; gap: 1px; flex: none; }
+  #umsg {
+    flex: 1 1 auto; text-align: center; color: var(--muted); font-size: 12px;
+    -webkit-app-region: no-drag; cursor: pointer;
   }
-  .fill {
-    height: 100%; width: 0%; border-radius: 3px 0 0 3px; background: var(--primary);
-    transition: width .35s ease, background-color .3s ease;
-  }
-  .fill.full { border-radius: 3px; }
-  .mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--mark); left: 0%; }
-
-  #ctx { margin-top: 9px; }
-  .crow { display: flex; align-items: center; font-size: 12px; }
-  .crow .lab { color: var(--label); font-weight: 600; }
-  #ctxBar {
-    position: relative; width: 40px; height: 7px; flex: none; margin: 0 8px;
-    border-radius: 3px; background: var(--bar-bg);
-  }
-  #ctxFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; border-radius: 3px; background: var(--primary); }
-  .crow .val { color: var(--text); }
-  .crow .sp { flex: 1; }
-  .crow .rt { font-size: 11px; white-space: nowrap; font-weight: 500; }
-  #ctxName {
-    margin-top: 2px; font-size: 10px; color: var(--subtle); cursor: pointer;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  #ctxName:hover { text-decoration: underline; }
-
-  #umsg { font-size: 12px; color: var(--muted); text-align: center; padding: 12px 4px; }
-  #umsg .act {
-    -webkit-app-region: no-drag; margin-top: 7px; padding: 4px 13px;
-    background: var(--primary); color: #fff; border: none; border-radius: 6px;
-    font-size: 12px; cursor: pointer;
-  }
-  #umsg .act:hover { background: var(--primary-soft); }
   .hidden { display: none !important; }
 </style>
 </head>
 <body>
-  <div id="card">
-    <div id="title">
-      <span id="dot"></span>
-      <span>Claude Counter</span>
-      <span class="sp"></span>
-      <button class="btn" id="theme" title="Switch to light theme">&#9728;</button>
-      <button class="btn" id="pick" title="Pick which session to track">&#9678;</button>
-      <button class="btn" id="refresh" title="Refresh now">&#8635;</button>
-      <button class="btn" id="close" title="Quit">&#10005;</button>
-    </div>
+<div id="bar">
+  <span id="dot"></span>
+  <span id="brand">Claude Counter</span>
 
-    <div id="bars">
-      <div class="metric">
-        <div class="mrow">
-          <span class="lab">Weekly</span><span class="val" id="wkPct">&ndash;</span>
-          <span class="tonorm" id="wkToNormal"></span>
-          <span class="sp"></span><span class="rt" id="wkPace"></span>
-        </div>
-        <div class="bar"><div class="fill" id="wkFill"></div><div class="mark" id="wkMark"></div></div>
-      </div>
-      <div class="metric">
-        <div class="mrow">
-          <span class="lab">Session</span><span class="val" id="sePct">&ndash;</span>
-          <span class="sp"></span><span class="rt" id="seReset"></span>
-        </div>
-        <div class="bar"><div class="fill" id="seFill"></div><div class="mark" id="seMark"></div></div>
-      </div>
+  <div id="metrics">
+    <div class="div"></div>
+    <div class="cell" id="wk">
+      <span class="lab">Weekly</span>
+      <span class="val" id="wkPct">–</span>
+      <div class="track"><div class="fill" id="wkFill"></div><div class="mark" id="wkMark"></div></div>
+      <span class="aux" id="wkAux"></span>
     </div>
-    <div id="umsg" class="hidden"></div>
-
-    <div id="ctx">
-      <div class="crow">
-        <span class="lab">Context</span>
-        <span id="ctxBar"><span id="ctxFill"></span></span>
-        <span class="val" id="ctxVal">&ndash;</span>
-        <span class="sp"></span>
-        <span class="rt" id="ctxWarn"></span>
-      </div>
-      <div id="ctxName" title="Click to pick a session">&nbsp;</div>
+    <div class="div"></div>
+    <div class="cell" id="se">
+      <span class="lab">Session</span>
+      <span class="val" id="sePct">–</span>
+      <div class="track"><div class="fill" id="seFill"></div><div class="mark" id="seMark"></div></div>
+      <span class="aux" id="seAux"></span>
+    </div>
+    <div class="div"></div>
+    <div class="cell ctx" id="ct">
+      <span class="lab">Context</span>
+      <span class="val" id="ctxVal">–</span>
+      <div class="track"><div class="fill" id="ctxFill"></div></div>
+      <span class="aux" id="ctxName" title="Click to pick a session"></span>
     </div>
   </div>
+
+  <div id="umsg" class="hidden"></div>
+
+  <div id="buttons">
+    <button class="btn" id="theme" title="Switch theme">&#9728;</button>
+    <button class="btn" id="pick" title="Pick which session to track">&#9678;</button>
+    <button class="btn" id="refresh" title="Refresh now">&#8635;</button>
+    <button class="btn" id="close" title="Quit">&#10005;</button>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -192,13 +188,13 @@ function fmtTokens(n) {
 function fmtReset(ms) {
   if (ms <= 0) return 'now';
   const s = Math.floor(ms / 1000);
-  if (s < 60) return 'in ' + s + 's';
+  if (s < 60) return s + 's';
   const m = Math.round(s / 60);
-  if (m < 60) return 'in ' + m + 'm';
+  if (m < 60) return m + 'm';
   const h = Math.floor(m / 60), rm = m % 60;
-  if (h < 24) return 'in ' + h + 'h ' + rm + 'm';
+  if (h < 24) return h + 'h ' + rm + 'm';
   const d = Math.floor(h / 24), rh = h % 24;
-  return 'in ' + d + 'd ' + rh + 'h';
+  return d + 'd ' + rh + 'h';
 }
 
 function fmtHours(h) {
@@ -213,18 +209,15 @@ function dotColor() {
 }
 
 function renderWeekly(w) {
-  const fill = $('#wkFill'), mark = $('#wkMark'), pace = $('#wkPace');
-  const toNorm = $('#wkToNormal');
+  const fill = $('#wkFill'), mark = $('#wkMark'), aux = $('#wkAux');
   if (!w) {
     $('#wkPct').textContent = '–';
-    fill.style.width = '0%'; mark.style.display = 'none'; pace.textContent = '';
-    toNorm.textContent = '';
+    fill.style.width = '0%'; mark.style.display = 'none'; aux.textContent = '';
     return;
   }
   const u = Math.max(0, Math.min(100, w.utilization));
   $('#wkPct').textContent = (Math.round(u * 10) / 10) + '%';
   fill.style.width = u + '%';
-  fill.classList.toggle('full', u >= 99.5);
   if (w.resets_at) {
     const reset = Date.parse(w.resets_at);
     const elapsed = Math.max(0, Math.min(1, (Date.now() - (reset - WK)) / WK));
@@ -233,60 +226,53 @@ function renderWeekly(w) {
     mark.style.display = '';
     mark.style.left = Math.max(0, Math.min(100, expected)) + '%';
     if (delta > 1) {
-      pace.textContent = '↑ ' + Math.round(delta) + '% over pace';
-      pace.style.color = cssVar('--bad');
-      fill.style.background = cssVar('--bad-fill');
-      // Hours of zero token use for the pace marker to catch up to current
-      // usage. The marker advances 100% per weekly window, so closing a
-      // delta-point gap takes delta / (100 / WK_hours) hours.
       const hrs = delta * (WK / 3600000) / 100;
-      toNorm.textContent = '~' + fmtHours(hrs) + ' to normal';
+      aux.textContent = '↑ ' + Math.round(delta) + '% over · ~' + fmtHours(hrs) + ' to normal';
+      aux.style.color = cssVar('--bad');
+      fill.style.background = cssVar('--bad-fill');
     } else if (delta < -1) {
-      pace.textContent = '↓ ' + Math.round(-delta) + '% under pace';
-      pace.style.color = cssVar('--good-text');
+      aux.textContent = '↓ ' + Math.round(-delta) + '% under pace';
+      aux.style.color = cssVar('--good-text');
       fill.style.background = cssVar('--good');
-      toNorm.textContent = '';
     } else {
-      pace.textContent = 'on pace';
-      pace.style.color = cssVar('--btn');
+      aux.textContent = 'on pace';
+      aux.style.color = cssVar('--btn');
       fill.style.background = cssVar('--primary');
-      toNorm.textContent = '';
     }
   } else {
     mark.style.display = 'none';
-    pace.textContent = '';
+    aux.textContent = '';
     fill.style.background = cssVar('--primary');
-    toNorm.textContent = '';
   }
 }
 
 function renderSession(w) {
-  const fill = $('#seFill'), mark = $('#seMark');
+  const fill = $('#seFill'), mark = $('#seMark'), aux = $('#seAux');
   if (!w) {
     $('#sePct').textContent = '–';
-    fill.style.width = '0%'; mark.style.display = 'none'; $('#seReset').textContent = '';
+    fill.style.width = '0%'; mark.style.display = 'none'; aux.textContent = '';
     return;
   }
   const u = Math.max(0, Math.min(100, w.utilization));
   $('#sePct').textContent = (Math.round(u * 10) / 10) + '%';
   fill.style.width = u + '%';
   fill.style.background = cssVar('--primary');
-  fill.classList.toggle('full', u >= 99.5);
   if (w.resets_at) {
     const reset = Date.parse(w.resets_at);
-    $('#seReset').textContent = 'resets ' + fmtReset(reset - Date.now());
+    aux.textContent = 'resets in ' + fmtReset(reset - Date.now());
+    aux.style.color = cssVar('--btn');
     const el = Math.max(0, Math.min(1, (Date.now() - (reset - SE)) / SE));
     mark.style.display = '';
     mark.style.left = (el * 100) + '%';
   } else {
-    $('#seReset').textContent = '';
+    aux.textContent = '';
     mark.style.display = 'none';
   }
 }
 
 function renderUsage() {
   const ok = !!(usage && usage.state === 'ok' && usage.usage);
-  $('#bars').classList.toggle('hidden', !ok);
+  $('#metrics').classList.toggle('hidden', !ok);
   $('#umsg').classList.toggle('hidden', ok);
   if (ok) {
     renderWeekly(usage.usage.seven_day);
@@ -295,30 +281,30 @@ function renderUsage() {
   }
   const m = $('#umsg');
   if (usage && usage.state === 'login') {
-    m.innerHTML = 'Sign in to claude.ai for the usage bars.' +
-      '<br><button class="act" id="si">Sign in</button>';
-    $('#si').onclick = () => ipcRenderer.send('cc-login');
+    m.textContent = 'Sign in to claude.ai for the usage bars  (click)';
+    m.style.color = cssVar('--muted');
+    m.onclick = () => ipcRenderer.send('cc-login');
   } else if (usage && usage.state === 'error') {
-    m.innerHTML = '⚠ ' + (usage.message || 'Connection error') +
-      '<br><button class="act" id="rt">Retry</button>';
-    $('#rt').onclick = () => ipcRenderer.send('cc-refresh');
+    m.textContent = '⚠ ' + (usage.message || 'Connection error') + '  (click to retry)';
+    m.style.color = cssVar('--bad');
+    m.onclick = () => ipcRenderer.send('cc-refresh');
   } else {
     m.textContent = 'Checking usage…';
+    m.style.color = cssVar('--muted');
+    m.onclick = null;
   }
 }
 
 function renderContext() {
-  const val = $('#ctxVal'), name = $('#ctxName'), fill = $('#ctxFill'), warn = $('#ctxWarn');
+  const val = $('#ctxVal'), name = $('#ctxName'), fill = $('#ctxFill');
   if (!ctx) {
     val.textContent = '–'; val.style.color = cssVar('--btn');
-    warn.textContent = '';
     name.textContent = 'no session found'; name.style.color = cssVar('--subtle');
     fill.style.width = '0%';
     return;
   }
   if (ctx.unavailable) {
     val.textContent = '–'; val.style.color = cssVar('--btn');
-    warn.textContent = '';
     name.textContent = 'claude · ' + (ctx.title || 'chat') + ' — sign in';
     name.style.color = cssVar('--subtle');
     fill.style.width = '0%';
@@ -332,19 +318,14 @@ function renderContext() {
   if (ctx.tier === 'huge') {
     val.style.color = cssVar('--bad');
     fill.style.background = cssVar('--bad-fill');
-    warn.textContent = '⚠ start a new chat';
-    warn.style.color = cssVar('--bad');
     name.style.color = cssVar('--bad');
   } else if (ctx.tier === 'large') {
     val.style.color = cssVar('--warn');
     fill.style.background = cssVar('--warn');
-    warn.textContent = 'getting large';
-    warn.style.color = cssVar('--warn');
     name.style.color = cssVar('--hint');
   } else {
     val.style.color = cssVar('--text');
     fill.style.background = cssVar('--primary');
-    warn.textContent = '';
     name.style.color = cssVar('--subtle');
   }
 }
@@ -379,7 +360,6 @@ $('#pick').onclick = () => ipcRenderer.send('cc-open-picker');
 $('#refresh').onclick = () => ipcRenderer.send('cc-refresh');
 $('#close').onclick = () => ipcRenderer.send('cc-quit');
 $('#ctxName').onclick = () => ipcRenderer.send('cc-open-picker');
-
 $('#theme').onclick = () => {
   const next = document.body.classList.contains('light') ? 'dark' : 'light';
   applyTheme(next);

@@ -401,11 +401,13 @@ async function buildSessionList() {
 // --- windows --------------------------------------------------------------
 function createOverlay() {
   const { workArea } = screen.getPrimaryDisplay();
-  const width = 300, height = 142;
+  // v0.5.6 top-bar: full screen width, slim horizontal strip floating at the top.
+  const width = Math.max(640, workArea.width - 16);
+  const height = 40;
   overlay = new BrowserWindow({
     width, height,
-    x: workArea.x + workArea.width - width - 16,
-    y: workArea.y + 16,
+    x: workArea.x + 8,
+    y: workArea.y + 4,
     frame: false, resizable: false, transparent: true, alwaysOnTop: true,
     skipTaskbar: false, fullscreenable: false, maximizable: false,
     title: 'Claude Counter',
